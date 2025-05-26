@@ -1,3 +1,6 @@
 [submodule "whale-sentinel-flask-agent"]
 	path = whale-sentinel-flask-agent
 	url = https://github.com/YangYang-Research/whale-sentinel-flask-agent.git
+[submodule "whale-sentinel-fastapi-agent"]
+	path = whale-sentinel-fastapi-agent
+	url = https://github.com/YangYang-Research/whale-sentinel-fastapi-agent.git
