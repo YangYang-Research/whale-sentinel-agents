@@ -4,3 +4,6 @@
 [submodule "whale-sentinel-fastapi-agent"]
 	path = whale-sentinel-fastapi-agent
 	url = https://github.com/YangYang-Research/whale-sentinel-fastapi-agent.git
+[submodule "whale-sentinel-django-agent"]
+	path = whale-sentinel-django-agent
+	url = https://github.com/YangYang-Research/whale-sentinel-django-agent.git
