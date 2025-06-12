@@ -40,17 +40,33 @@ jobs:
         run: |
           FOUND_VERSION=""
           for module in $(git config --file .gitmodules --get-regexp path | awk '{ print $2 }'); do
-            pushd $module > /dev/null
+            echo "Checking submodule: $module"
+            SUBMODULE_COMMIT=$(git rev-parse HEAD:$module)
+            echo "Commit SHA: $SUBMODULE_COMMIT"
+
+            # Get remote url from .gitmodules
+            URL=$(git config -f .gitmodules --get submodule.$module.url)
+            echo "Cloning $URL"
+            git clone --no-checkout "$URL" tmp-submodule
+            cd tmp-submodule
+            git checkout $SUBMODULE_COMMIT
+
             COMMIT_MSG=$(git log -1 --pretty=%B)
-            VERSION=$(echo "$COMMIT_MSG" | grep -oP 'Release:\s*\K[^\s]+' || true)
-            if [ -n "$VERSION" ]; then
-              FOUND_VERSION=$VERSION
+            echo "Submodule commit message: $COMMIT_MSG"
+
+            if [[ "$COMMIT_MSG" =~ Release:[[:space:]]*v?([0-9a-zA-Z._-]+) ]]; then
+              FOUND_VERSION="${BASH_REMATCH[1]}"
+              echo "Extracted version: $FOUND_VERSION"
+              cd ..
+              rm -rf tmp-submodule
               break
             fi
-            popd > /dev/null
-          done
-          echo "version=$FOUND_VERSION" >> $GITHUB_OUTPUT
 
+            cd ..
+            rm -rf tmp-submodule
+          done
+
+          echo "version=$FOUND_VERSION" >> $GITHUB_OUTPUT
   validate:
     runs-on: ubuntu-latest
     needs: [extract_main_version, extract_submodule_version]
