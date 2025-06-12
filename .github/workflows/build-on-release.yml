@@ -1,4 +1,4 @@
-name: Build on Release
+name: Build Submodules on Release
 
 on:
   push:
@@ -7,102 +7,102 @@ on:
     branches: ["main"]
 
 jobs:
-  extract_main_version:
+  check-release-version:
+    name: Check Main Commit Release Version
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.extract.outputs.version }}
+      valid: ${{ steps.check.outputs.valid }}
     steps:
-      - name: 📦 Checkout main repo
-        uses: actions/checkout@v4
+      - name: Checkout main repo
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      - name: 🏷 Extract version from main commit
-        id: extract
+      - name: Check main commit message
+        id: check
         run: |
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
-          VERSION=$(echo "$COMMIT_MSG" | grep -oP 'Release:\s*\K[^\s]+' || true)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Main commit message: $COMMIT_MSG"
 
-  extract_submodule_version:
+          if [[ "$COMMIT_MSG" =~ Release:[[:space:]]*([0-9a-zA-Z._-]+) ]]; then
+            echo "✅ Main release version: ${BASH_REMATCH[1]}"
+            echo "valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ No Release version found in main commit."
+            echo "valid=false" >> $GITHUB_OUTPUT
+
+  extract-release-info:
+    name: Extract Release Info from Submodules
+    needs: check-release-version
+    if: needs.check-release-version.outputs.valid == 'true'
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.extract.outputs.version }}
+      ready: ${{ steps.check.outputs.ready }}
+      build_matrix: ${{ steps.check.outputs.build_matrix }}
     steps:
-      - name: 📦 Checkout repo with submodules
-        uses: actions/checkout@v4
+      - name: Checkout with submodules
+        uses: actions/checkout@v3
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - name: 🏷 Extract version from submodule commits
-        id: extract
+      - name: Extract submodule release info
+        id: check
+        shell: bash
         run: |
-          FOUND_VERSION=""
-          for module in $(git config --file .gitmodules --get-regexp path | awk '{ print $2 }'); do
-            echo "Checking submodule: $module"
-            SUBMODULE_COMMIT=$(git rev-parse HEAD:$module)
-            echo "Commit SHA: $SUBMODULE_COMMIT"
+          set -e
 
-            # Get remote url from .gitmodules
-            URL=$(git config -f .gitmodules --get submodule.$module.url)
-            echo "Cloning $URL"
-            git clone --no-checkout "$URL" tmp-submodule
-            cd tmp-submodule
-            git checkout $SUBMODULE_COMMIT
+          SUBMODULES=(
+            whale-sentinel-django-agent
+            whale-sentinel-fastapi-agent
+            whale-sentinel-flask-agent
+          )
 
-            COMMIT_MSG=$(git log -1 --pretty=%B)
-            echo "Submodule commit message: $COMMIT_MSG"
+          ALL_SUCCESS=true
+          MATRIX_INCLUDE=()
+
+          for DIR in "${SUBMODULES[@]}"; do
+            echo "🔍 Checking submodule: $DIR"
+            COMMIT_MSG=$(git log -1 --pretty=%B -- "$DIR")
+            echo "🧾 Commit message from main repo: $COMMIT_MSG"
 
             if [[ "$COMMIT_MSG" =~ Release:[[:space:]]*v?([0-9a-zA-Z._-]+) ]]; then
-              FOUND_VERSION="${BASH_REMATCH[1]}"
-              echo "Extracted version: $FOUND_VERSION"
-              cd ..
-              rm -rf tmp-submodule
-              break
+              VERSION="${BASH_REMATCH[1]}"
+              echo "✅ Found release version: $VERSION"
+              MATRIX_INCLUDE+=("{\"name\":\"$DIR\",\"version\":\"$VERSION\"}")
+            else
+              echo "⚠️ No valid Release: version found for $DIR"
+              ALL_SUCCESS=false
             fi
-
-            cd ..
-            rm -rf tmp-submodule
           done
 
-          echo "version=$FOUND_VERSION" >> $GITHUB_OUTPUT
-  validate:
+          echo "ready=$ALL_SUCCESS" >> $GITHUB_OUTPUT
+          MATRIX_JSON=$(printf '[%s]' "$(IFS=,; echo "${MATRIX_INCLUDE[*]}")")
+          echo "build_matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+
+  build-submodules:
+    name: Build Submodules
+    needs: extract-release-info
+    if: needs.extract-release-info.outputs.ready == 'true'
     runs-on: ubuntu-latest
-    needs: [extract_main_version, extract_submodule_version]
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.extract-release-info.outputs.build_matrix) }}
     steps:
-      - name: ✅ Validate main and submodule versions
-        run: |
-          MAIN_VERSION="${{ needs.extract_main_version.outputs.version }}"
-          SUB_VERSION="${{ needs.extract_submodule_version.outputs.version }}"
-
-          if [ -z "$MAIN_VERSION" ] || [ -z "$SUB_VERSION" ]; then
-            echo "❌ Missing version. Exiting."
-            exit 1
-          fi
-
-          if [ "$MAIN_VERSION" != "$SUB_VERSION" ]; then
-            echo "❌ Version mismatch: $MAIN_VERSION != $SUB_VERSION"
-            exit 1
-          fi
-
-          echo "✅ Versions matched: $MAIN_VERSION"
-
-  build:
-    runs-on: ubuntu-latest
-    needs: validate
-    steps:
-      - name: 📦 Checkout with submodules
-        uses: actions/checkout@v4
+      - name: Checkout with submodules
+        uses: actions/checkout@v3
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - name: 🛠 Build submodules
+      - name: Build ${{ matrix.name }}
+        working-directory: ./${{ matrix.name }}
         run: |
-          for module in $(git config --file .gitmodules --get-regexp path | awk '{ print $2 }'); do
-            echo "Building $module..."
-            pushd $module > /dev/null
-            chmod +x ./build-and-install.sh
-            ./build-and-install.sh
-            popd > /dev/null
+          chmod +x ./build-and-install.sh
+          ./build-and-install.sh
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-dist
+          path: ${{ matrix.name }}/dist
