@@ -144,6 +144,6 @@ jobs:
             - Submodules built from Release commits.
           files: artifacts/**/*  # Upload everything in artifacts dir
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
 
 
