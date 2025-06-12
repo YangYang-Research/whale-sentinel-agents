@@ -1,4 +1,4 @@
-name: Build Submodules on Release
+name: Build on Release
 
 on:
   push:
@@ -7,46 +7,40 @@ on:
     branches: ["main"]
 
 jobs:
-  check-release-version:
-    name: Check Main Commit Release Version
+  extract_main_version:
     runs-on: ubuntu-latest
     outputs:
-      valid: ${{ steps.check.outputs.valid }}
+      version: ${{ steps.extract.outputs.version }}
     steps:
-      - name: Checkout main repo
-        uses: actions/checkout@v3
+      - name: 📦 Checkout main repo
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Check main commit message
-        id: check
+      - name: 🏷 Extract version from main commit
+        id: extract
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
           echo "Main commit message: $COMMIT_MSG"
+          VERSION=$(echo "$COMMIT_MSG" | grep -oP 'Release:\s*\K[^\s]+' || true)
+          echo "Extracted version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-          if [[ "$COMMIT_MSG" =~ Release:[[:space:]]*([0-9a-zA-Z._-]+) ]]; then
-            echo "✅ Main release version: ${BASH_REMATCH[1]}"
-            echo "valid=true" >> $GITHUB_OUTPUT
-          else
-            echo "❌ No Release version found in main commit."
-            echo "valid=false" >> $GITHUB_OUTPUT
-
-  extract-release-info:
+  extract_submodule_versions:
     name: Extract Release Info from Submodules
-    needs: check-release-version
-    if: needs.check-release-version.outputs.valid == 'true'
+    needs: extract_main_version
     runs-on: ubuntu-latest
     outputs:
       ready: ${{ steps.check.outputs.ready }}
       build_matrix: ${{ steps.check.outputs.build_matrix }}
     steps:
-      - name: Checkout with submodules
-        uses: actions/checkout@v3
+      - name: 📦 Checkout with submodules
+        uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Extract submodule release info
+      - name: 🔍 Extract submodule versions
         id: check
         shell: bash
         run: |
@@ -62,7 +56,7 @@ jobs:
           MATRIX_INCLUDE=()
 
           for DIR in "${SUBMODULES[@]}"; do
-            echo "🔍 Checking submodule: $DIR"
+            echo "📂 Checking submodule: $DIR"
             COMMIT_MSG=$(git log -1 --pretty=%B -- "$DIR")
             echo "🧾 Commit message from main repo: $COMMIT_MSG"
 
@@ -80,28 +74,28 @@ jobs:
           MATRIX_JSON=$(printf '[%s]' "$(IFS=,; echo "${MATRIX_INCLUDE[*]}")")
           echo "build_matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
-  build-submodules:
+  build_submodules:
     name: Build Submodules
-    needs: extract-release-info
-    if: needs.extract-release-info.outputs.ready == 'true'
+    needs: extract_submodule_versions
+    if: needs.extract_submodule_versions.outputs.ready == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include: ${{ fromJson(needs.extract-release-info.outputs.build_matrix) }}
+        include: ${{ fromJson(needs.extract_submodule_versions.outputs.build_matrix) }}
     steps:
-      - name: Checkout with submodules
-        uses: actions/checkout@v3
+      - name: 📦 Checkout with submodules
+        uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Build ${{ matrix.name }}
+      - name: 🛠 Build submodule ${{ matrix.name }}
         working-directory: ./${{ matrix.name }}
         run: |
           chmod +x ./build-and-install.sh
           ./build-and-install.sh
 
-      - name: Upload build artifact
+      - name: 📤 Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}-dist
