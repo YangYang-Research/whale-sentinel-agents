@@ -96,9 +96,9 @@ jobs:
         working-directory: ${{ matrix.name }}
         run: |
           echo "➡️ Entering submodule: ${{ matrix.name }}"
-          if [ -f "./buid-and-install.sh" ]; then
-            chmod +x ./buid-and-install.sh
-            ./buid-and-install.sh
+          if [ -f "./build-and-install.sh" ]; then
+            chmod +x ./build-and-install.sh
+            ./build-and-install.sh
           else
             echo "❌ buid-and-install.sh not found in submodule ${{ matrix.name }}"
             exit 1
