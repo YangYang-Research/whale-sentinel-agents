@@ -1,5 +1,8 @@
 # Whale Sentinel Agents
 
+[![Horusec Security Scan](https://github.com/YangYang-Research/whale-sentinel-agents/actions/workflows/horusec-scan.yml/badge.svg?branch=main)](https://github.com/YangYang-Research/whale-sentinel-agents/actions/workflows/horusec-scan.yml)
+[![Build on Release](https://github.com/YangYang-Research/whale-sentinel-agents/actions/workflows/build-on-release.yml/badge.svg?branch=main)](https://github.com/YangYang-Research/whale-sentinel-agents/actions/workflows/build-on-release.yml)
+
 | No. | Language | Framework  | Support | Agent | Agent Version | 
 | --- | -------- | --------- | ------- | ----- | ------------- |
 | 1 | Python | Flask >= 3.0.0 | :white_check_mark: |  whale-sentinel-flask-agent | 0.1.0 |
