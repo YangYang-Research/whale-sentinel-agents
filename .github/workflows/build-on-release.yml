@@ -7,11 +7,35 @@ on:
     branches: ["main"]
 
 jobs:
-  extract_versions:
+  ##########################################
+  # 1. Extract version from main repository
+  ##########################################
+  extract_main_version:
     runs-on: ubuntu-latest
     outputs:
-      main_version: ${{ steps.extract_main.outputs.main_version }}
-      sub_version: ${{ steps.extract_sub.outputs.sub_version }}
+      version: ${{ steps.extract.outputs.version }}
+    steps:
+      - name: 📦 Checkout main repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🏷 Extract version from main commit
+        id: extract
+        run: |
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          VERSION=$(echo "$COMMIT_MSG" | grep -oP 'Release:\s*\K[^\s]+' || true)
+          echo "Commit message: $COMMIT_MSG"
+          echo "Extracted version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+  ##########################################
+  # 2. Extract version from submodules
+  ##########################################
+  extract_submodule_version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
     steps:
       - name: 📦 Checkout repo with submodules
         uses: actions/checkout@v4
@@ -19,15 +43,8 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: 🏷 Extract version from main commit
-        id: extract_main
-        run: |
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
-          VERSION=$(echo "$COMMIT_MSG" | grep -oP 'Release:\s*\K[^\s]+' || true)
-          echo "main_version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: 🏷 Extract version from submodule commits
-        id: extract_sub
+        id: extract
         run: |
           FOUND_VERSION=""
           for module in $(git config --file .gitmodules --get-regexp path | awk '{ print $2 }'); do
@@ -40,29 +57,39 @@ jobs:
             fi
             popd > /dev/null
           done
-          echo "sub_version=$FOUND_VERSION" >> $GITHUB_OUTPUT
+          echo "Submodule version: $FOUND_VERSION"
+          echo "version=$FOUND_VERSION" >> $GITHUB_OUTPUT
 
+  ##########################################
+  # 3. Validate versions
+  ##########################################
   validate:
     runs-on: ubuntu-latest
-    needs: extract_versions
+    needs: [extract_main_version, extract_submodule_version]
     steps:
-      - name: ✅ Validate versions
+      - name: ✅ Validate main and submodule versions
         run: |
-          MAIN_VERSION="${{ needs.extract_versions.outputs.main_version }}"
-          SUB_VERSION="${{ needs.extract_versions.outputs.sub_version }}"
+          MAIN_VERSION="${{ needs.extract_main_version.outputs.version }}"
+          SUB_VERSION="${{ needs.extract_submodule_version.outputs.version }}"
+
+          echo "Main version: $MAIN_VERSION"
+          echo "Submodule version: $SUB_VERSION"
 
           if [ -z "$MAIN_VERSION" ] || [ -z "$SUB_VERSION" ]; then
-            echo "❌ Missing version info. Skipping."
+            echo "❌ Missing version. Exiting."
             exit 1
           fi
 
           if [ "$MAIN_VERSION" != "$SUB_VERSION" ]; then
-            echo "❌ Version mismatch."
+            echo "❌ Version mismatch: $MAIN_VERSION != $SUB_VERSION"
             exit 1
           fi
 
           echo "✅ Versions matched: $MAIN_VERSION"
 
+  ##########################################
+  # 4. Build submodules
+  ##########################################
   build:
     runs-on: ubuntu-latest
     needs: validate
@@ -76,17 +103,21 @@ jobs:
       - name: 🛠 Build submodules
         run: |
           for module in $(git config --file .gitmodules --get-regexp path | awk '{ print $2 }'); do
+            echo "Building $module..."
             pushd $module > /dev/null
             chmod +x ./build-and-install.sh
             ./build-and-install.sh
             popd > /dev/null
           done
 
+  ##########################################
+  # 5. Upload artifacts
+  ##########################################
   upload_artifacts:
     runs-on: ubuntu-latest
-    needs: [extract_versions, build]
+    needs: [extract_main_version, build]
     steps:
-      - name: 📦 Checkout repo
+      - name: 📦 Checkout again to access files
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -94,7 +125,7 @@ jobs:
 
       - name: 📁 Collect versioned artifacts
         run: |
-          VERSION="${{ needs.extract_versions.outputs.main_version }}"
+          VERSION="${{ needs.extract_main_version.outputs.version }}"
           mkdir -p artifacts
           for module in $(git config --file .gitmodules --get-regexp path | awk '{ print $2 }'); do
             DIST_PATH="$module/dist"
@@ -102,11 +133,14 @@ jobs:
             if [ -d "$DIST_PATH" ]; then
               mkdir -p "$DEST"
               cp -r $DIST_PATH/* "$DEST/"
+              echo "✅ Copied $DIST_PATH to $DEST"
+            else
+              echo "⚠️ No dist/ found in $module"
             fi
           done
 
       - name: ⬆️ Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-artifacts-${{ needs.extract_versions.outputs.main_version }}
+          name: release-artifacts-${{ needs.extract_main_version.outputs.version }}
           path: artifacts
