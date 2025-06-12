@@ -74,8 +74,8 @@ jobs:
           MATRIX_JSON=$(printf '[%s]' "$(IFS=,; echo "${MATRIX_INCLUDE[*]}")")
           echo "build_matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
-  build_submodules:
-    name: Build Submodules
+  build_agents:
+    name: Build Agents
     needs: extract_submodule_versions
     if: needs.extract_submodule_versions.outputs.ready == 'true'
     runs-on: ubuntu-latest
@@ -92,11 +92,17 @@ jobs:
       - name: 🛠 Build submodule ${{ matrix.name }}
         working-directory: ./${{ matrix.name }}
         run: |
-          chmod +x ./build-and-install.sh
-          ./build-and-install.sh
+          if [ -f "./buid-and-install.sh" ]; then
+            chmod +x ./buid-and-install.sh
+            ./buid-and-install.sh
+          else
+            echo "❌ Script buid-and-install.sh not found in ${{ matrix.name }}"
+            exit 1
+          fi
 
       - name: 📤 Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}-dist
           path: ${{ matrix.name }}/dist
+
