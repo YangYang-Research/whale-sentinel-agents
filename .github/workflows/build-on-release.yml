@@ -75,7 +75,7 @@ jobs:
           echo "build_matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
   build_agents:
-    name: Build Agents
+    name: 🔧 Build Agents
     needs: extract_submodule_versions
     if: needs.extract_submodule_versions.outputs.ready == 'true'
     runs-on: ubuntu-latest
@@ -83,26 +83,31 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.extract_submodule_versions.outputs.build_matrix) }}
     steps:
-      - name: 📦 Checkout with submodules
+      - name: 📦 Checkout main repo with submodules
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - name: 🛠 Build submodule ${{ matrix.name }}
-        working-directory: ./${{ matrix.name }}
+      - name: 🔁 Init submodules
+        run: git submodule update --init --recursive
+
+      - name: 🛠 Run build inside submodule
+        working-directory: ${{ matrix.name }}
         run: |
+          echo "➡️ Entering submodule: ${{ matrix.name }}"
           if [ -f "./buid-and-install.sh" ]; then
             chmod +x ./buid-and-install.sh
             ./buid-and-install.sh
           else
-            echo "❌ Script buid-and-install.sh not found in ${{ matrix.name }}"
+            echo "❌ buid-and-install.sh not found in submodule ${{ matrix.name }}"
             exit 1
           fi
 
-      - name: 📤 Upload dist artifact
+      - name: 📤 Upload build artifacts from dist/
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}-dist
           path: ${{ matrix.name }}/dist
+
 
