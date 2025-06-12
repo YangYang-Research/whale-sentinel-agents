@@ -8,8 +8,7 @@ on:
 
 jobs:
   build:
-    if: >
-      contains(github.event.head_commit.message, 'Release:')
+    if: contains(github.event.head_commit.message, 'Release:')
     runs-on: ubuntu-latest
 
     steps:
@@ -17,7 +16,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          fetch-depth: 0  # Needed to fetch full commit history
+          fetch-depth: 0
+
+      - name: Extract version from commit message
+        id: extract_version
+        run: |
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          VERSION=$(echo "$COMMIT_MSG" | grep -oP 'Release:\s*\K[^\s]+')
+          echo "Extracted version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Verify submodule commits contain 'Release:'
         id: verify_submodules
@@ -44,8 +51,9 @@ jobs:
           echo "❌ No 'Release:' commit found in any submodule."
           exit 1
 
-      - name: Build each submodule
+      - name: Build submodules and collect versioned artifacts
         run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
           mkdir -p artifacts
           for module in $(git config --file .gitmodules --get-regexp path | awk '{ print $2 }'); do
             echo "🔧 Building $module..."
@@ -53,13 +61,18 @@ jobs:
             chmod +x ./build-and-install.sh
             ./build-and-install.sh
             if [ -d "./dist" ]; then
-              cp -r ./dist "../artifacts/$module"
+              DEST="../artifacts/${module}-${VERSION}"
+              mkdir -p "$DEST"
+              cp -r ./dist/* "$DEST/"
+              echo "✅ Copied dist to $DEST"
+            else
+              echo "⚠️ No dist/ found in $module"
             fi
             popd
           done
 
-      - name: Upload artifacts
+      - name: Upload versioned artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: built-submodule-artifacts
+          name: release-artifacts-${{ steps.extract_version.outputs.version }}
           path: artifacts
