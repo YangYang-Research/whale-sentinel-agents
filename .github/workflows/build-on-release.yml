@@ -115,4 +115,35 @@ jobs:
           name: ${{ matrix.name }}-dist
           path: ${{ matrix.name }}/dist
 
+  create_release:
+    name: 🚀 Create GitHub Release
+    needs:
+      - extract_main_version
+      - build_agents
+    if: needs.extract_main_version.outputs.version != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 🗂 List downloaded files (debug)
+        run: |
+          echo "📁 All downloaded artifacts:"
+          find artifacts -type f
+
+      - name: 📝 Create GitHub Release and Upload Artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.extract_main_version.outputs.version }}
+          name: Release v${{ needs.extract_main_version.outputs.version }}
+          body: |
+            🚀 Auto-generated release from CI
+            - Triggered by: ${{ github.actor }}
+            - Submodules built from Release commits.
+          files: artifacts/**/*  # Upload everything in artifacts dir
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
