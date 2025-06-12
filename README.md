@@ -19,3 +19,5 @@ Add this agent environment to your application enviroment
 `WS_GATEWAY_API="your_whale_sentinel_gateway_api"`
 
 `WS_AGENT_AUTH_TOKEN="your_agent_authentication_token"`
+
+`WS_VERIFY_TLS="true"`
