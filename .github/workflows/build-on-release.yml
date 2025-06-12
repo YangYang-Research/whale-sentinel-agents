@@ -1,0 +1,65 @@
+name: Build on Release
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    if: >
+      contains(github.event.head_commit.message, 'Release:')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main repo with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0  # Needed to fetch full commit history
+
+      - name: Verify submodule commits contain 'Release:'
+        id: verify_submodules
+        run: |
+          echo "Checking submodule commits for 'Release:' tag..."
+          HAS_RELEASE=false
+          for module in $(git config --file .gitmodules --get-regexp path | awk '{ print $2 }'); do
+            echo "Checking submodule: $module"
+            pushd $module > /dev/null
+            RECENT_COMMIT=$(git log -1 --pretty=%B)
+            echo "Last commit: $RECENT_COMMIT"
+            if [[ "$RECENT_COMMIT" == *"Release:"* ]]; then
+              HAS_RELEASE=true
+              echo "Release found in $module"
+            fi
+            popd > /dev/null
+          done
+
+          echo "has_release=$HAS_RELEASE" >> $GITHUB_OUTPUT
+
+      - name: Stop if submodules do not have Release commit
+        if: steps.verify_submodules.outputs.has_release != 'true'
+        run: |
+          echo "❌ No 'Release:' commit found in any submodule."
+          exit 1
+
+      - name: Build each submodule
+        run: |
+          mkdir -p artifacts
+          for module in $(git config --file .gitmodules --get-regexp path | awk '{ print $2 }'); do
+            echo "🔧 Building $module..."
+            pushd $module
+            chmod +x ./build-and-install.sh
+            ./build-and-install.sh
+            if [ -d "./dist" ]; then
+              cp -r ./dist "../artifacts/$module"
+            fi
+            popd
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-submodule-artifacts
+          path: artifacts
