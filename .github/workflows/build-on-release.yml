@@ -23,7 +23,13 @@ jobs:
           COMMIT_MSG="${{ github.event.head_commit.message }}"
           echo "Main commit message: $COMMIT_MSG"
           VERSION=$(echo "$COMMIT_MSG" | grep -oP 'Release:\s*\K[^\s]+' || true)
-          echo "Extracted version: $VERSION"
+          VERSION=$(echo "$COMMIT_MSG" | grep -oP 'Release:\s*\K[^\s]+')
+          if [ -z "$VERSION" ]; then
+            echo "❌ No release version found in commit message. Exiting..."
+            exit 1
+          fi
+
+          echo "✅ Extracted version: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
   extract_submodule_versions:
