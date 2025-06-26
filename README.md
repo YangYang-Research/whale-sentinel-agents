@@ -81,12 +81,18 @@ Each request may trigger a metadata payload sent to Whale Sentinel backend or st
 
 ---
 
-### 📄 License
+## 🤝 Contributing
 
-This project is licensed under the MIT License.
+We welcome contributions and feedback. Please fork the repository and open a pull request with your suggested changes.
 
 ---
 
-### 🛡️ Security & Reporting
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+---
+
+## 🛡️ Security & Reporting
 
 If you discover a vulnerability, please report it responsibly via GitHub Issues or contact the maintainers privately.
