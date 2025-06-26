@@ -85,6 +85,8 @@ jobs:
     needs: extract_submodule_versions
     if: needs.extract_submodule_versions.outputs.ready == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         include: ${{ fromJson(needs.extract_submodule_versions.outputs.build_matrix) }}
@@ -128,6 +130,8 @@ jobs:
       - build_agents
     if: needs.extract_main_version.outputs.version != ''
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: ⬇️ Download all build artifacts
         uses: actions/download-artifact@v4
