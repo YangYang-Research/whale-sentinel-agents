@@ -128,6 +128,8 @@ jobs:
       - build_agents
     if: needs.extract_main_version.outputs.version != ''
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: ⬇️ Download all build artifacts
         uses: actions/download-artifact@v4
