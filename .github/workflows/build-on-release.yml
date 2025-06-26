@@ -9,6 +9,8 @@ on:
 jobs:
   extract_main_version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       version: ${{ steps.extract.outputs.version }}
     steps:
@@ -36,6 +38,8 @@ jobs:
     name: Extract Release Info from Submodules
     needs: extract_main_version
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       ready: ${{ steps.check.outputs.ready }}
       build_matrix: ${{ steps.check.outputs.build_matrix }}
