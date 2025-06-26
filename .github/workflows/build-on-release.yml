@@ -143,7 +143,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.extract_main_version.outputs.version }}
-          name: Release v${{ needs.extract_main_version.outputs.version }}
+          name: Release ${{ needs.extract_main_version.outputs.version }}
           body: |
             🚀 Auto-generated release from CI
             - Triggered by: ${{ github.actor }}
