@@ -79,9 +79,13 @@ Each request may trigger a metadata payload sent to Whale Sentinel backend or st
 ### 6. Timestamps
 - request_created_at: UTC timestamp in ISO 8601 format
 
+---
+
 ### 📄 License
 
 This project is licensed under the MIT License.
+
+---
 
 ### 🛡️ Security & Reporting
 
